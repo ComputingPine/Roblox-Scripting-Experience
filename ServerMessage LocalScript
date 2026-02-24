@@ -1,0 +1,46 @@
+local rS = game:GetService("ReplicatedStorage")
+local guiMessage = rS:WaitForChild("GUI")
+local rE = rS:WaitForChild("Events")
+local cdEvent = rE:WaitForChild("CountDown")
+
+local tS = game:GetService("TweenService")
+local smFrame = script.Parent.ServerMessage
+local cdFrame = script.Parent.CountDown
+
+local function setupGui()
+	local strng = guiMessage:GetAttribute("ServerMessage")
+	if strng == "" then
+		smFrame.Position = UDim2.new(.5, 0, 1.5, 0)
+	else
+		smFrame.Position = UDim2.new(.5, 0, .95, 0)
+		smFrame.Text = strng
+	end
+end
+
+guiMessage:GetAttributeChangedSignal("ServerMessage"):Connect(function()
+	local strng = guiMessage:GetAttribute("ServerMessage")
+	local tInfo = TweenInfo.new(1, Enum.EasingStyle.Back, Enum.EasingDirection.InOut, 0, false)
+	local pos = UDim2.new()
+	if strng == "" then
+		pos = UDim2.new(.5, 0, 1.5, 0)
+	else
+		pos = UDim2.new(.5, 0, .95, 0)
+		smFrame.Text = strng
+	end
+	local tweenT = {Position = pos}
+	local tween = tS:Create(smFrame, tInfo, tweenT)
+	tween:Play()
+end)
+
+cdEvent.OnClientEvent:Connect(function(bool, strng)
+	cdFrame.Visible = bool
+	local textLabel = cdFrame.TextLabel
+	local tInfo = TweenInfo.new(.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out, 0, false)
+	local tweenT = {Size = UDim2.new(.15,0,.15,0)}
+	textLabel.Size = UDim2.new(.3,0,.3,0)
+	textLabel.Text = strng
+	local tween = tS:Create(textLabel, tInfo, tweenT)
+	tween:Play()
+end)
+
+setupGui()
