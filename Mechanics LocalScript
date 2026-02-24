@@ -1,0 +1,252 @@
+local plyrs = game:GetService("Players")
+local plyr = plyrs.LocalPlayer
+local char = plyr.Character
+local humanoid = char:WaitForChild("Humanoid")
+local plyrModule = require(plyr:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"))
+local gameFolder = plyr:WaitForChild("GameFolder")
+
+local rE = game:GetService("ReplicatedStorage"):WaitForChild("Events")
+local tcEvent = rE:WaitForChild("ToggleControls")
+local tmEvent = rE:WaitForChild("ToggleMovement")
+local rmEvent = rE:WaitForChild("ResetMovement")
+local tagEvent = rE:WaitForChild("Tag")
+
+local cAS = game:GetService("ContextActionService")
+local num = 4
+
+local cS = game:GetService("CollectionService")
+
+local animator = humanoid:WaitForChild("Animator")
+local slideAnim  = Instance.new("Animation")
+if humanoid.RigType == Enum.HumanoidRigType.R15 then
+	slideAnim.AnimationId = "rbxassetid://117772485326022"
+elseif humanoid.RigType == Enum.HumanoidRigType.R6 then
+	slideAnim.AnimationId = "rbxassetid://85327570655333"
+end
+local slideTrack = animator:LoadAnimation(slideAnim)
+local diveAnim = Instance.new("Animation")
+if humanoid.RigType == Enum.HumanoidRigType.R15 then
+	diveAnim.AnimationId = "rbxassetid://85742144769916"
+elseif humanoid.RigType == Enum.HumanoidRigType.R6 then
+	diveAnim.AnimationId = "rbxassetid://85742144769916"
+end
+local diveTrack = animator:LoadAnimation(diveAnim)
+ 
+local linVel = Instance.new("LinearVelocity")
+linVel.Parent = char
+linVel.VelocityConstraintMode = Enum.VelocityConstraintMode.Plane
+linVel.PrimaryTangentAxis = Vector3.new(1,0,0)
+linVel.SecondaryTangentAxis = Vector3.new(0,0,1)
+linVel.Attachment0 = char:WaitForChild("HumanoidRootPart"):WaitForChild("RootAttachment")
+linVel.Enabled = false
+linVel.RelativeTo = Enum.ActuatorRelativeTo.World
+
+local room = game.Workspace:WaitForChild("Stage"):WaitForChild("Room")
+
+local function disableMovement()
+	humanoid.WalkSpeed = 0
+	humanoid.JumpHeight = 0
+end
+
+local function enableMovement()
+	humanoid.WalkSpeed = 24
+	humanoid.JumpHeight = 3.5
+end
+
+local function resetMovement()
+	humanoid.WalkSpeed = 16
+	humanoid.JumpHeight = 7.2
+	plyrModule:GetControls():Enable()
+end
+
+local speed = 36
+local duration = .75
+
+local function getVectorsUsed(v3)
+	local n = 0
+	if v3.X ~= 0 then
+		n += 1
+	end
+	if v3.Z ~= 0 then
+		n += 1
+	end
+	if n == 0 then
+		n=1
+	end
+	return n
+end
+
+local function getVector3(v3)
+	local n = getVectorsUsed(v3)
+	local x, z = 0, 0
+	if math.abs(v3.X) == 1 then
+		x = math.sqrt(n) * v3.X*speed/n
+	else
+		x = v3.X * speed
+	end
+	if math.abs(v3.Z) == 1 then
+		z = math.sqrt(n) * v3.Z*speed/n
+	else
+		z = v3.Z * speed
+	end
+	return x, z
+end
+
+local moveBool = false
+local function moveMech(funcName, inputState, inputObject)
+	if inputState ~= Enum.UserInputState.Begin then return end
+	if not plyr:HasTag("InGame") or gameFolder:GetAttribute("Tagged") then return end
+	if moveBool then return end
+	if humanoid.Jump or humanoid.FloorMaterial == Enum.Material.Air then return end
+	if plyrModule:GetControls():GetMoveVector().Magnitude == 0 then return end
+	local x, z = getVector3(char.PrimaryPart.CFrame.LookVector)
+	linVel.PlaneVelocity = Vector2.new(x,z)
+	linVel.MaxForce = 50000
+	linVel.Enabled = true
+	disableMovement()
+	moveBool = true
+	local track
+	if funcName == "Slide" then
+		track = slideTrack
+	else
+		track = diveTrack -- make it dive
+	end
+	track:Play()
+	char:FindFirstChild("HumanoidRootPart").CanCollide = false
+	for i = 1, duration*4 do
+		linVel.MaxForce *= .7
+		task.wait(duration/4)
+	end
+	track:Stop()
+	char:FindFirstChild("HumanoidRootPart").CanCollide = true
+	linVel.Enabled = false
+	enableMovement()
+	task.wait(1)
+	moveBool = false
+end
+
+local function tagPlayer(funcName, inputState, inputObject)
+	if inputState ~= Enum.UserInputState.Begin then return end
+	if not plyr:HasTag("InGame") or gameFolder:GetAttribute("Tagged") then return end
+	local hB = Instance.new("Part")
+	local weld = Instance.new("WeldConstraint")
+	weld.Parent = hB
+	weld.Enabled = false
+	weld.Part0 = hB
+	weld.Part1 = char.PrimaryPart
+	hB.CanCollide = false
+	hB.Size = Vector3.new(4,5,5)
+	hB.PivotOffset = CFrame.new(0,0,-2.5)
+	hB.CFrame = char.PrimaryPart.CFrame * hB.PivotOffset
+	hB.Transparency = 0.2
+	weld.Enabled = true
+	hB.Parent = game.Workspace
+	local ovrP = OverlapParams.new()
+	ovrP.FilterType = Enum.RaycastFilterType.Include
+	local plyrTeam = 0
+	if plyr:HasTag("Team1") then
+		plyrTeam = 1
+	end
+	if plyr:HasTag("Team2") then
+		plyrTeam = 2
+	end
+	local potentialTargets = {}
+	for i,v in ipairs(cS:GetTagged("InGame")) do
+		local p2GF = v:FindFirstChild("GameFolder")
+		local bool = false
+		if v == plyr or v:HasTag("Immortal") then
+			bool = true
+		end
+		local vTeam = 3
+		if v:HasTag("Team1") then
+			vTeam = 1
+		end
+		if v:HasTag("Team2") then
+			vTeam = 2
+		end
+		if room:GetAttribute("Freeze") then
+			if plyrTeam == vTeam and not p2GF:GetAttribute("Tagged") then
+				bool = true
+			end
+		else
+			if plyrTeam == vTeam then
+				bool = true
+				print("Same Team")
+			end
+		end
+		if plyrTeam ~= vTeam and p2GF:GetAttribute("Tagged") then
+			bool = true
+		end
+		if not bool then
+			table.insert(potentialTargets, v.Character)
+		end
+	end
+	ovrP.FilterDescendantsInstances = {potentialTargets}
+	local targets = game.Workspace:GetPartsInPart(hB, ovrP)
+	hB:Destroy()
+	local charTargets = {}
+	for i,v in ipairs(targets) do
+		local char = v:FindFirstAncestorWhichIsA("Model")
+		if not table.find(charTargets, char) then
+			table.insert(charTargets, char)
+		end
+	end
+	local plyr2 = nil
+	for i,v in ipairs(charTargets) do
+		local plyr2Char = v:FindFirstAncestorWhichIsA("Model")
+		if plyr2 == nil then
+			local distance = (char.PrimaryPart.Position - v.PrimaryPart.Position).Magnitude
+			if distance <= 5 then
+				plyr2 = v
+			end
+		else
+			local oldD = (char.PrimaryPart.Position - v.PrimaryPart.Position).Magnitude
+			local newD = (char.PrimaryPart.Position - plyr2.PrimaryPart.Position).Magnitude
+			if newD < oldD then
+				plyr2 = v
+			end
+		end
+	end
+	print(plyr2)
+	if plyr2 then
+		tagEvent:FireServer(plyr2)
+	end
+end
+
+local function enableControls()
+	cAS:BindAction("Slide", moveMech, true, Enum.KeyCode.LeftShift)
+	cAS:BindAction("Dive", moveMech, true, Enum.KeyCode.LeftControl)
+	cAS:BindAction("Tag", tagPlayer, true, Enum.UserInputType.MouseButton1, Enum.KeyCode.F)
+	plyrModule:GetControls():Enable()
+end
+
+local function disableControls()
+	cAS:UnbindAction("Slide")
+	cAS:UnbindAction("Dive")
+	cAS:UnbindAction("Tag")
+	plyrModule:GetControls():Disable()
+end
+	
+
+tcEvent.OnClientEvent:Connect(function(bool)
+	if bool then
+		enableControls()
+	else
+		disableControls()
+	end
+end)
+
+tmEvent.OnClientEvent:Connect(function(bool)
+	if bool then
+		enableMovement()
+	else
+		disableMovement()
+	end
+end)
+
+rmEvent.OnClientEvent:Connect(function()
+	resetMovement()
+end)
+
+task.wait(2)
+enableControls()
