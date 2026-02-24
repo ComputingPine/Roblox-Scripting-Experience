@@ -1,0 +1,225 @@
+local module = {}
+
+local plyr = game:GetService("Players").LocalPlayer
+local plyrModule = require(plyr:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"))
+local camera = game.Workspace.CurrentCamera
+
+local uIS = game:GetService("UserInputService")
+local cAS = game:GetService("ContextActionService")
+local rS = game:GetService("RunService")
+
+local desiredSpeed = 50
+local scripty = 0
+
+
+--[[MATH FOR FLYING]]
+local function getVectorsUsed(plyrVector)
+	local n = 0
+	if plyrVector.X ~= 0 then
+		n+=1
+	end
+	if scripty ~= 0 then
+		n+=1
+	end
+	if plyrVector.Z ~= 0 then
+		n += 1
+	end
+	if n == 0 then
+		n=1
+	end
+	return n
+end
+
+local function getDirection()
+	local plyrVector = plyrModule:GetControls():GetMoveVector()
+	local n = getVectorsUsed(plyrVector)
+	local x, y, z = 0, 0, 0
+	if math.abs(plyrVector.X) == 1 then
+		x = math.sqrt(n) * plyrVector.X * desiredSpeed/n
+	else
+		x = plyrVector.X * desiredSpeed
+	end
+	y = math.sqrt(n) * scripty * desiredSpeed/n
+	if math.abs(plyrVector.Z) == 1 then
+		z = math.sqrt(n) * plyrVector.Z * desiredSpeed/n
+	else
+		z = plyrVector.Z * desiredSpeed
+	end
+	return x, y, z
+end
+
+function fly()
+	local char = plyr.Character
+	local gameStatus = char:FindFirstChild("GameStatus")
+	if gameStatus:GetAttribute("KO") then return end
+	local lineVel = char:FindFirstChild("LinearVelocity")
+	local alignOr = char:FindFirstChild("AlignOrientation")
+	local x, y, z = getDirection()
+	lineVel.VectorVelocity = Vector3.new(x, y, z)
+	if not gameStatus:GetAttribute("Dash") then
+		alignOr.CFrame = camera.CFrame.Rotation
+	elseif gameStatus:GetAttribute("Dash") then
+		if gameStatus:FindFirstChild("Dash").Value ~= nil then
+			local cfFace = CFrame.lookAt(char.PrimaryPart.CFrame.Position, gameStatus:FindFirstChild("Dash").Value.PrimaryPart.CFrame.Position)
+			alignOr.CFrame = cfFace
+		end
+	end
+	
+end
+
+--[[UP/DOWN]]
+local spaceToggle = false
+local leftCtrlToggle = false
+
+local function upVector(event, inputState, inputObj)
+	if inputState == Enum.UserInputState.Cancel then
+		scripty = 0
+		spaceToggle = false
+		leftCtrlToggle = false
+	end
+	if event == "Space" then
+		if inputState == Enum.UserInputState.Begin and not spaceToggle then
+			spaceToggle = true
+			scripty += 1
+		else if inputState == Enum.UserInputState.End and spaceToggle then
+				spaceToggle = false
+				scripty -= 1
+			end
+		end
+	elseif event == "LeftControl" then
+		if inputState == Enum.UserInputState.Begin and not leftCtrlToggle then
+			leftCtrlToggle = true
+			scripty += -1
+		else if inputState == Enum.UserInputState.End and leftCtrlToggle then
+				leftCtrlToggle = false
+				scripty -= -1
+			end
+		end
+	end
+	if scripty > 1 then
+		scripty = 1
+	elseif scripty < -1 then
+		scripty = -1
+	end
+end
+
+
+--[[MOBILE BUTTONS]]
+local function phoneCAS(spaceButton, leftCtrlButton, toggleButton)
+	if spaceButton ~= nil then
+		cAS:SetPosition("Space", UDim2.new(1,-95,1,-90))
+		spaceButton.Size = UDim2.new(0,70,0,70)
+	end
+	if leftCtrlButton ~= nil then
+		cAS:SetPosition("LeftControl", UDim2.new(1,-165,1,-83))
+		leftCtrlButton.Size = UDim2.new(0,63,0,63)
+	end
+	if toggleButton ~= nil then
+		cAS:SetPosition("ToggleFlight", UDim2.new(1,-77,1,-150))
+		toggleButton.Size = UDim2.new(0,52,0,52)
+	end
+	--for whatever reason, leftCtrlButton.Size is going nil
+end
+
+local function tabletCAS(spaceButton, leftCtrlButton, toggleButton)
+	if spaceButton ~= nil then
+		cAS:SetPosition("Space", UDim2.new(1,-170,1,-210))
+		spaceButton.Size = UDim2.new(0,120,0,120)
+	end
+	if leftCtrlButton ~= nil then
+		cAS:SetPosition("LeftControl", UDim2.new(1,-290,1,-198))
+		leftCtrlButton.Size = UDim2.new(0,108,0,108)
+	end
+	if toggleButton ~= nil then
+		cAS:SetPosition("ToggleFlight", UDim2.new(1,-134,1,-313))
+		toggleButton.Size = UDim2.new(0,84,0,84)		
+	end
+end
+
+function module.startFly()
+	print("Start")
+	cAS:BindAction("Space", upVector, true, Enum.KeyCode.Space)
+	cAS:SetTitle("Space", "Up")
+	cAS:BindAction("LeftControl", upVector, true, Enum.KeyCode.LeftControl)
+	cAS:SetTitle("LeftControl", "Down")
+	rS:BindToRenderStep("Fly", 1, fly)
+	plyr.Character:FindFirstChild("Humanoid").AutoRotate = false
+	plyr.Character:FindFirstChild("LinearVelocity").Enabled = true
+	plyr.Character:FindFirstChild("AlignOrientation").Enabled = true
+	if uIS.TouchEnabled then
+		local jumpButton = plyr:WaitForChild("PlayerGui"):WaitForChild("TouchGui"):WaitForChild("TouchControlFrame"):WaitForChild("JumpButton")
+		local spaceButton = cAS:GetButton("Space")
+		local leftCtrlButton = cAS:GetButton("LeftControl")
+		print(spaceButton)
+		print(leftCtrlButton)
+		jumpButton.Visible = false
+		if jumpButton.Size == UDim2.new(0,70,0,70) then
+			phoneCAS(spaceButton, leftCtrlButton)
+		elseif jumpButton.Size == UDim2.new(0, 120, 0 ,120) then
+			tabletCAS(spaceButton, leftCtrlButton)
+		end
+	end
+end
+
+function module.stopFly()
+	print("Stop")
+	cAS:UnbindAction("Space")
+	cAS:UnbindAction("LeftControl")
+	rS:UnbindFromRenderStep("Fly")
+	plyr.Character:FindFirstChild("Humanoid").AutoRotate = true
+	plyr.Character:FindFirstChild("LinearVelocity").Enabled = false
+	plyr.Character:FindFirstChild("AlignOrientation").Enabled = false
+	if uIS.TouchEnabled then
+		plyr:WaitForChild("PlayerGui"):WaitForChild("TouchGui"):WaitForChild("TouchControlFrame"):WaitForChild("JumpButton").Visible = true
+	end
+end
+
+
+--[[TOGGLE FLIGHT]]
+local function toggleFlight(event, inputState, inputObj)
+	if inputState == Enum.UserInputState.Begin then
+		if not plyr.Character:FindFirstChild("LinearVelocity").Enabled then
+			module.startFly()
+			if uIS.TouchEnabled then
+				local jumpButton = plyr:WaitForChild("PlayerGui"):WaitForChild("TouchGui"):WaitForChild("TouchControlFrame"):WaitForChild("JumpButton")
+				cAS:SetTitle("ToggleFlight", "Walk")
+				jumpButton.Visible = false
+			end
+		else
+			module.stopFly()
+			if uIS.TouchEnabled then
+				local jumpButton = plyr:WaitForChild("PlayerGui"):WaitForChild("TouchGui"):WaitForChild("TouchControlFrame"):WaitForChild("JumpButton")
+				cAS:SetTitle("ToggleFlight", "Fly")
+				jumpButton.Visible = true
+			end	
+		end
+	end
+end
+
+function module.VoluntaryFlight()
+	cAS:BindAction("ToggleFlight", toggleFlight, true, Enum.KeyCode.F)
+	if uIS.TouchEnabled then
+		local jumpButton = plyr:WaitForChild("PlayerGui"):WaitForChild("TouchGui"):WaitForChild("TouchControlFrame"):WaitForChild("JumpButton")
+		local toggleButton = cAS:GetButton("ToggleFlight")
+		print(toggleButton)
+		if plyr.Character:FindFirstChild("LinearVelocity").Enabled then
+			cAS:SetTitle("ToggleFlight", "Walk")
+			jumpButton.Visible = false
+		else
+			cAS:SetTitle("ToggleFlight", "Fly")
+			jumpButton.Visible = true
+		end
+		if jumpButton.Size == UDim2.new(0,70,0,70) then
+			phoneCAS(nil, nil, toggleButton)
+		elseif jumpButton.Size == UDim2.new(0, 120, 0 ,120) then
+			tabletCAS(nil, nil, toggleButton)
+		end
+	end
+end
+
+function module.ForceFlight()
+	cAS:UnbindAction("ToggleFlight")
+	module.startFly()
+end
+
+return module
