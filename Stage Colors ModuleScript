@@ -1,0 +1,65 @@
+local colors = {
+	
+	["Classic"] = {
+		["Primary"] = Color3.fromRGB(231, 231, 236),
+		["Secondary"] = Color3.fromRGB(0, 255, 255),
+		["Highlight"] = Color3.fromRGB(0,0,0)
+	},
+	
+	["NewClassic"] = {
+		["Primary"] = Color3.fromRGB(231, 231, 236),
+		["Secondary"] = Color3.fromRGB(128, 0, 255),
+		["Highlight"] = Color3.fromRGB(0,0,0)
+	},
+	
+	["Dark"] = {
+		["Primary"] = Color3.fromRGB(0,0,0),
+		["Secondary"] = Color3.fromRGB(0, 255, 255),
+		["Highlight"] = Color3.fromRGB(231, 231, 236)
+	},
+	
+	["Night"] = {
+		["Primary"] = Color3.fromRGB(0,0,0),
+		["Secondary"] = Color3.fromRGB(128, 0, 255),
+		["Highlight"] = Color3.fromRGB(231, 231, 236)
+	},
+	
+	["Neo"] = {
+		["Primary"] = Color3.fromRGB(47, 178, 195),
+		["Secondary"] = Color3.fromRGB(154, 154, 157),
+		["Highlight"] = Color3.fromRGB(128, 0, 255)
+	},
+	
+	["NewNeo"] = {
+		["Primary"] = Color3.fromRGB(128, 0, 255),
+		["Secondary"] = Color3.fromRGB(154, 154, 157),
+		["Highlight"] = Color3.fromRGB(47, 178, 195)
+	},
+	
+	["Inverted"] = {
+		["Primary"] = Color3.fromRGB(24, 24, 19),
+		["Secondary"] = Color3.fromRGB(255, 0, 0),
+		["Highlight"] = Color3.fromRGB(255, 255, 255)
+	},
+	
+	["NewInverted"] = {
+		["Primary"] = Color3.fromRGB(24, 24, 19),
+		["Secondary"] = Color3.fromRGB(127, 255, 0),
+		["Highlight"] = Color3.fromRGB(255, 255, 255)
+	},
+	
+	["NeoInverted"] = {
+		["Primary"] = Color3.fromRGB(208, 77, 60),
+		["Secondary"] = Color3.fromRGB(101, 101, 98),
+		["Highlight"] = Color3.fromRGB(127, 255, 0)
+	},
+	
+	["NewNeoInverted"] = {
+		["Primary"] = Color3.fromRGB(127, 255, 0),
+		["Secondary"] = Color3.fromRGB(101, 101, 98),
+		["Highlight"] = Color3.fromRGB(208, 77, 60)
+	},
+	
+}
+
+return colors
