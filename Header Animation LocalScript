@@ -1,0 +1,188 @@
+local tS = game:GetService("TweenService")
+local players = game:GetService("Players")
+local plyr = players.LocalPlayer
+
+local rS = game:GetService("ReplicatedStorage")
+local rE = rS:WaitForChild("Events")
+local svfBind = rE:WaitForChild("ShowVoteFrame")
+
+local guiMessage = rS:WaitForChild("GUI")
+local guiVote = guiMessage:WaitForChild("Vote")
+local guiGame = guiMessage:WaitForChild("Game")
+
+local hud = script.Parent.Frame
+local frames = {
+	["Left"] = hud.LeftFrame,
+	["Right"] = hud.RightFrame,
+	["Center"] = hud.CenterFrame,
+}
+local timer = frames["Center"].Timer
+local timerImages = {
+	["Game"] = "rbxassetid://100381775248934",
+	["Lobby"] = "rbxassetid://135162460302359",
+}
+local lines = hud.Lines
+
+local function teamAppear(activeBool, teamBool)
+	local timerPos = UDim2.new()
+	local framePos = UDim2.new()
+	local fT = {["Frame1"] = "", ["Frame2"] = ""}
+	local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.InOut)
+	if activeBool then
+		timerPos = UDim2.new(.5,0,1.5,0)
+		local timerTT = {Position = timerPos}
+		local timerTween = tS:Create(timer, tweenInfo, timerTT)
+		local linesTT = {AspectRatio = 12.715}
+		local linesTween = tS:Create(lines.UIAspectRatioConstraint, tweenInfo, linesTT)
+		timerTween:Play()
+		linesTween:Play()
+	end
+	task.wait(0.5)
+	if teamBool then
+		fT.Frame1 = frames["Left"].TeamFrame
+		fT.Frame2 = frames["Right"].TeamFrame
+		if activeBool then
+			timerPos = UDim2.new(.5,0,.9,0)
+			framePos = UDim2.new(.5,0,0.07,0)
+			timer.Image = timerImages["Game"]
+		else
+			timerPos = UDim2.new(.5,0,1.5,0)
+			framePos = UDim2.new(.5,0,-0.5,0)
+		end
+	else
+		fT.Frame1 = frames["Left"].PlayerList
+		fT.Frame2 = frames["Right"].PlayerList
+		if activeBool then
+			timerPos = UDim2.new(.5,0,.9,0)
+			framePos = UDim2.new(.472,0,0.1,0)
+			timer.Image = timerImages["Game"]
+		else
+			timerPos = UDim2.new(.5,0,1.5,0)
+			framePos = UDim2.new(.472,0,-0.4,0)
+		end
+	end
+	local frameTT = {Position = framePos}
+	local timerTT = {Position = timerPos}
+	for i,v in pairs(fT) do
+		local tween = tS:Create(v, tweenInfo, frameTT)
+		tween:Play()
+	end
+	local tween = tS:Create(timer, tweenInfo, timerTT)
+	tween:Play()
+	task.wait(0.5)
+	if not activeBool then
+		timerPos = UDim2.new(.5,0,.9,0)
+		timer.Image = timerImages["Lobby"]
+		local timerTT = {Position = timerPos}
+		local timerTween = tS:Create(timer, tweenInfo, timerTT)
+		local linesTT = {AspectRatio = 25.43}
+		local linesTween = tS:Create(lines.UIAspectRatioConstraint, tweenInfo, linesTT)
+		timerTween:Play()
+		linesTween:Play()
+	end
+end
+
+local function voteTrans(bool)
+	local backPos = UDim2.new()
+	local pos = UDim2.new()
+	if bool then
+		backPos = UDim2.new(.5,0,.8,0)
+		pos = UDim2.new(.5,0,2.5,0)
+	else
+		backPos = UDim2.new(.5,0,2.7,0)
+		pos = UDim2.new(.5, 0, 1, 0)
+	end
+	local backtInfo = TweenInfo.new(.35, Enum.EasingStyle.Linear, Enum.EasingDirection.In)
+	local backTweenT = {Position = backPos}
+	local backTween = tS:Create(hud.CenterFrame, backtInfo, backTweenT)
+	backTween:Play()
+	task.wait(.35)
+	local tweenInfo = TweenInfo.new(.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+	lines.Visible = not bool
+	local tweenT = {Position = pos}
+	local tween = tS:Create(hud.CenterFrame, tweenInfo, tweenT)
+	tween:Play()
+end
+
+local function setupGui()
+	local gameBool = guiGame:GetAttribute("Game")
+	local voteBool = guiVote:GetAttribute("Voting")
+	if gameBool then
+		local teamBool = guiGame:GetAttribute("Teams")
+		lines.UIAspectRatioConstraint.AspectRatio = 12.715
+		timer.Image = timerImages["Game"]
+		local fT = {["Frame1"] = "", ["Frame2"] = ""}
+		local framePos = UDim2.new()
+		if teamBool then
+			fT.Frame1 = frames["Left"].TeamFrame
+			fT.Frame2 = frames["Right"].TeamFrame
+			framePos = UDim2.new(.5,0,0.07,0)
+		else
+			fT.Frame1 = frames["Left"].PlayerList
+			fT.Frame2 = frames["Right"].PlayerList
+			framePos = UDim2.new(.472,0,0.1,0)
+		end
+		for i,v in pairs(fT) do
+			v.Position = framePos
+		end
+	end
+	if voteBool then
+		hud.CenterFrame.Position = UDim2.new(.5,0,2.5,0)
+	else
+		hud.CenterFrame.Position = UDim2.new(.5, 0, 1, 0)
+	end
+	timer.Time.Text = guiMessage:GetAttribute("Timer")
+	lines.Visible = not voteBool
+end
+
+guiMessage:GetAttributeChangedSignal("Timer"):Connect(function()
+	timer.Time.Text = guiMessage:GetAttribute("Timer")
+end)
+
+guiVote:GetAttributeChangedSignal("Voting"):Connect(function()
+	local bool = guiVote:GetAttribute("Voting")
+	if bool then
+		voteTrans(bool)
+		svfBind:Fire(bool)
+	end
+end)
+
+guiGame:GetAttributeChangedSignal("Game"):Connect(function()
+	teamAppear(guiGame:GetAttribute("Game"), guiGame:GetAttribute("Teams"))
+end)
+
+svfBind.Event:Connect(function(bool)
+	if not bool then
+		voteTrans(bool)
+	end
+end)
+
+for i,v in ipairs(guiGame:GetChildren()) do
+	for h,k in ipairs(v:GetChildren()) do
+		local plyrFrame
+		k.Changed:Connect(function()
+			local teamBool = guiGame:GetAttribute("Teams")
+			if k.Value ~= nil then
+				local side = v.Name
+				local p = k.Value
+				if teamBool then
+					plyrFrame = script.Teams:FindFirstChild(side):Clone()
+					plyrFrame.Parent = frames[side].TeamFrame.PlayerFrame
+				else
+					plyrFrame = script.FFA:FindFirstChild(side):Clone()
+					plyrFrame.Parent = frames[side].PlayerList
+					local colorGrad
+					if p == plyr then
+						colorGrad = script.FFA.Ally:Clone()
+					else
+						colorGrad = script.FFA.Enemy:Clone()
+					end
+					colorGrad.Parent = plyrFrame
+				end
+				plyrFrame.PlayerIcon.Image = players:GetUserThumbnailAsync(p.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+			end
+		end)
+	end
+end
+
+setupGui()
