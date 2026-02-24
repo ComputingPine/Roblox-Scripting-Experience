@@ -1,0 +1,154 @@
+local tS = game:GetService("TweenService")
+local tweenTime = 2
+local tInfo = TweenInfo.new(tweenTime, Enum.EasingStyle.Linear, Enum.EasingDirection.Out, -1, true, 0)
+
+local colors = {
+	["Win"] = {
+		["Primary"] = Color3.fromRGB(231, 231, 236),
+		["Secondary"] = Color3.fromRGB(239, 184, 56),
+		["Accent_1"] = Color3.fromRGB(4, 175, 236),
+		["Accent_2"] = Color3.fromRGB(236, 0, 236),
+	},
+	["MVP"] = {
+		["Primary"] = Color3.fromRGB(231, 231, 236),
+		["Secondary"] = Color3.fromRGB(239, 184, 56),
+		["Accent_1"] = Color3.fromRGB(4, 175, 236),
+		["Accent_2"] = Color3.fromRGB(236, 0, 236),
+	},
+	["Ace"] = {
+		["Primary"] = Color3.fromRGB(17, 17, 17),
+		["Secondary"] = Color3.fromRGB(71, 71, 71),
+		["Accent_1"] = Color3.fromRGB(159, 161, 172),
+		["Accent_2"] = Color3.fromRGB(236, 0, 236),
+		["Accent_3"] = Color3.fromRGB(4, 175, 236),
+	}
+}
+
+local connections = {}
+local moveTask = nil
+
+local module = {}
+
+local function accentColor(crown, tweens, t)
+	if #tweens > 0 then
+		for i,v in ipairs(tweens) do
+			v:Cancel()
+		end
+		tweens = {}
+	end
+	local tier = crown:GetAttribute("Tier")
+	for i,v in pairs(t) do
+		local color
+		color = crown:GetAttribute(i)
+		for h,k in ipairs(v) do
+			if tier == 0 then
+				k.Transparency = 1
+			else
+				k.Transparency = 0
+				k.Color = color
+				if tier == 1 then
+					k.Material = Enum.Material.SmoothPlastic
+				elseif tier == 2 then
+					k.Material = Enum.Material.Neon
+					local h, s, val = color:ToHSV()
+					local tTable = {Color = Color3.fromHSV(h, s, .49)}
+					tweens[#tweens+1] = tS:Create(k, tInfo, tTable)
+					tweens[#tweens]:Play()
+				end
+			end
+		end
+	end
+	return tweens
+end
+
+local function setColor(t, c)
+	for i,v in ipairs(t) do
+		v.Color = c
+	end
+end
+
+local function checkCustomizable(crown, strng)
+	if not crown:GetAttribute("Customizable") then
+		crown:SetAttribute(strng, colors[strng])
+		return false
+	else
+		return true
+	end
+end
+
+function module.WearCrown(crown)
+	
+	if #connections > 0 then
+		for i,v in pairs(connections) do
+			v:Disconnect()
+		end
+	end
+	
+	if moveTask then
+		task.cancel(moveTask)
+	end
+	
+	local tweens = {}
+	local colorTable = { ["Primary"] = {}, ["Secondary"] = {}, ["Accents"] = {}}
+	
+	for i,v in ipairs(crown:GetDescendants()) do
+		if v:HasTag("Accent") then
+			local accNum 
+			if colorTable.Accents["Accent_"..v:GetAttribute("Accent")] == nil then
+				colorTable.Accents["Accent_"..v:GetAttribute("Accent")] = {}
+			end
+			table.insert(colorTable.Accents["Accent_"..v:GetAttribute("Accent")], v)
+		elseif v:HasTag("Primary") then
+			table.insert(colorTable.Primary, v)
+		elseif v:HasTag("Secondary") then
+			table.insert(colorTable.Secondary, v)
+		end
+	end
+	
+	setColor(colorTable.Primary, crown:GetAttribute("Primary"))
+	setColor(colorTable.Secondary, crown:GetAttribute("Secondary"))
+	tweens = accentColor(crown, tweens, colorTable.Accents)
+	
+	connections[#connections+1] = crown:GetAttributeChangedSignal("Tier"):Connect(function()
+		tweens = accentColor(crown, tweens, colorTable.Accents)
+	end)
+	
+	for i,v in pairs(crown:GetAttributes()) do
+		local valType = typeof(crown:GetAttribute(i))
+		if valType == "Color3" then
+			connections[#connections+1] = crown:GetAttributeChangedSignal(i):Connect(function()
+				local bool = checkCustomizable(crown, i)
+				if bool then
+					local color = crown:GetAttribute(i)
+					if i == "Primary" or i == "Secondary" then
+						setColor(colorTable[i], color)
+					else
+						tweens = accentColor(crown, tweens, colorTable.Accents)
+					end
+				end
+			end)
+		end
+	end
+	
+	connections[#connections+1] =crown:GetAttributeChangedSignal("Reset"):Connect(function()
+		if crown:GetAttribute("Reset") then
+			for i,v in pairs(colors) do
+				crown:SetAttribute(i, v)
+			end
+			crown:SetAttribute("Reset", false)
+		end
+	end)
+	
+	local cylCon = crown.PrimaryPart.CylindricalConstraint
+	moveTask = task.spawn(function()
+		local num = cylCon.Velocity
+		while true do
+			task.wait(.75)
+			cylCon.Velocity = num*-1
+			task.wait(.75)
+			cylCon.Velocity = num
+		end
+	end)
+end
+
+return module
