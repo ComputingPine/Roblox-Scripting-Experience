@@ -1,0 +1,267 @@
+local module = {}
+
+local folder = game:GetService("ServerStorage"):WaitForChild("Stages")
+local platforms = folder:WaitForChild("Platforms")
+local walks = platforms:WaitForChild("Walks")
+local slopes = platforms:WaitForChild("Slopes")
+local joints = folder:WaitForChild("Joints")
+local legs = folder:WaitForChild("Legs")
+local platformParts = {}
+local walkParts = walks:GetChildren()
+local slopeParts = slopes:GetChildren()
+local jointParts = joints:GetChildren()
+local legParts = legs:GetChildren()
+
+for i,v in pairs(walkParts) do
+	table.insert(platformParts, v)
+end
+
+for i,v in pairs(slopeParts) do
+	table.insert(platformParts, v)
+end
+
+local heightTable = {"S", "M", "T"}
+
+
+local function randomItem(itemType)
+	local randTable
+	if itemType == platforms then
+		randTable = platformParts
+	elseif itemType == joints then
+		randTable = jointParts
+	end
+	local itemModel = randTable[math.random(1, #randTable)]
+	local randItem = itemModel:Clone()
+	return randItem, itemModel.Parent, itemType
+end
+
+local function partSetup(part, partModel, neonModel, room)
+	part.Parent = partModel
+	part.PrimaryPart.Anchored = false
+	part.PrimaryPart.Color = room:GetAttribute("Primary")
+	local neonFolder = part.Neon
+	for _,v in ipairs(neonFolder:GetChildren()) do
+		v.Color = room:GetAttribute("Secondary")
+	end
+	neonFolder.Parent = neonModel
+end
+
+local  legCache = {}
+for i,v in ipairs(legParts) do
+	legCache[v.Name] = v
+end
+local function genLeg(part, partModel, neonModel, room)
+	local pHeight = part:GetAttribute("Height")
+	local pLegs = part:GetAttribute("Legs")
+	if pLegs == 0 or pHeight == "G" then return end
+	local legNum = math.random(1, pLegs)
+	local legModel = legCache[pHeight]
+	for i,v in ipairs(part.PrimaryPart:GetChildren()) do
+		if tonumber(v.Name) == 2 and legNum > 2 then continue end
+		if v:IsA("Attachment") and not v:GetAttribute("IsJoint") and tonumber(v.Name) <= legNum then
+			local leg = legModel:Clone()
+			leg.PrimaryPart.RigidConstraint.Attachment0 = v
+			partSetup(leg, partModel, neonModel, room)
+		end
+	end
+end
+
+local function checkBounds(newModel, size)
+	local bounds = newModel:GetExtentsSize()
+	if math.floor(bounds.X) > size or  math.floor(bounds.Z) > size then
+		return true
+	else
+		return false
+	end
+end
+
+local slopeCache = {}
+for i,v in ipairs(slopeParts) do
+	local min = v:GetAttribute("Min")
+	local max = v:GetAttribute("Max")
+	slopeCache[min] = slopeCache[min] or {}
+	slopeCache[max] = slopeCache[max] or {}
+	table.insert(slopeCache[min], v)
+	table.insert(slopeCache[max], v)
+end
+local jT = {}
+local function jointCache(p)
+	if jT[p] then return end
+	jT[p] = {}
+	for i = 1, 4 do
+		local attach = p.PrimaryPart:FindFirstChild("U"..i, true)
+		if attach then
+			table.insert(jT[p], attach)
+		end
+	end
+end
+local function genJoint(part, cat, newModel, partModel, neonModel, size, partCount, maxParts, room)
+	local function attachJoints(jJ, pJ)
+		local rigCon = jJ.RigidConstraint
+		rigCon.Attachment1 = pJ
+		rigCon.Enabled = true
+	end
+	local function removeIndex(t, p)
+		p:SetAttribute("Used", true)
+		local num = table.find(t, p)
+		table.remove(t, num)
+		if #t == 0 then
+			t = nil
+		end
+	end
+	local joint = randomItem(joints)
+	jointCache(joint)
+	local jJoint = jT[joint][math.random(1, #jT[joint])]
+	removeIndex(jT[joint], jJoint)
+	jointCache(part)
+	local pJoint = jT[part][math.random(1, #jT[part])]
+	jT[part] = nil
+	if cat == slopes then
+		if pJoint == part.PrimaryPart.U2 then
+			joint:SetAttribute("Height", part:GetAttribute("Min"))
+		elseif pJoint == part.PrimaryPart.U1 then
+			joint:SetAttribute("Height", part:GetAttribute("Max"))
+		end
+	else
+		joint:SetAttribute("Height", part:GetAttribute("Height"))
+	end
+	attachJoints(jJoint, pJoint)
+	partSetup(joint, partModel, neonModel, room)
+
+	local partTable = {}
+	local num = 0
+	local jointHeight = joint:GetAttribute("Height")
+	for i,v in ipairs(jT[joint]) do
+		local bool = math.random() < 0.5
+		if not bool and num > 0 then continue end
+		num+=1
+		local pBool = math.random() < 0.5
+		local newPart
+		local nPJ
+		if pBool and jointHeight ~= "G" then
+			newPart = {walkParts[math.random(1, #walkParts)]:Clone(), walks, platforms}
+		elseif not pBool or jointHeight == "G" then
+			newPart = {slopeCache[jointHeight][math.random(1, #slopeCache[jointHeight])]:Clone(), slopes, platforms}
+		end
+		jointCache(newPart[1])
+		if newPart[2] == slopes then
+			local minHeight = newPart[1]:GetAttribute("Min")
+			local maxHeight = newPart[1]:GetAttribute("Max")
+			if jointHeight == minHeight then
+				nPJ = newPart[1].PrimaryPart.U2
+			elseif jointHeight == maxHeight then
+				nPJ = newPart[1].PrimaryPart.U1
+			end
+		else
+			newPart[1]:SetAttribute("Height", jointHeight)
+			nPJ = jT[newPart[1]][math.random(1, #jT[newPart[1]])]
+		end
+		removeIndex(jT[newPart[1]], nPJ)
+		removeIndex(jT[joint], v)
+		attachJoints(v, nPJ)
+		partTable[#partTable+1] = newPart
+	end
+	jT[joint] = nil
+	if partCount == math.floor(maxParts/2) and partCount > 3 then
+		local bBool = checkBounds(newModel, size)
+		if bBool then
+			for i,v in ipairs(partTable) do
+				jT[v[1]] = nil
+				v[1]:Destroy()
+			end
+			return {}
+		end
+	end
+	
+	return partTable
+end
+
+local function genStage(itemType, base, room)
+	script.Highlight.OutlineColor = room:GetAttribute("Highlight")
+	local newModel = Instance.new("Model")
+	local partModel = Instance.new("Model")
+	partModel.Parent = newModel
+	local neonModel = Instance.new("Model")
+	neonModel.Parent = newModel
+	local highlight1 = script.Highlight:Clone()
+	highlight1.Parent = partModel
+	local highlight2 = script.Highlight:Clone()
+	highlight2.Parent = neonModel
+	local partTable = {}
+	partTable[1] = {randomItem(itemType)}
+	partTable[1][1].Parent = partModel
+	if partTable[1][1]:GetAttribute("Height") == nil or partTable[1][1]:GetAttribute("Height") == "" then
+		partTable[1][1]:SetAttribute("Height", heightTable[math.random(1, #heightTable)])
+	end
+	local num = 0
+	local maxParts = base:GetAttribute("Num")
+	local size = base:GetAttribute("Size")
+	repeat task.wait()
+		local partTable2 = {}
+		for i = 1, #partTable do
+			if #partTable == 0 then break end	
+			num += 1
+			partSetup(partTable[i][1], partModel, neonModel, room)
+			genLeg(partTable[i][1], partModel, neonModel, room)
+			if num > maxParts then jT[partTable[i][1]] = nil continue end
+			local pTable = genJoint(partTable[i][1], partTable[i][2], newModel, partModel, neonModel, size, num, maxParts, room)
+			for _,v in ipairs(pTable) do
+				partTable2[#partTable2+1] = v
+			end
+		end
+		partTable = partTable2
+	until #partTable == 0
+	return newModel
+end
+
+local function newModelSetup(base, folder, room)
+	table.clear(jT)
+	local newModel = genStage(platforms, base, room)
+	newModel.Parent = folder
+	local p = newModel:FindFirstChildWhichIsA("Part", true)
+	p.Anchored = true
+	local rP = Instance.new("Part")
+	rP.Transparency = .1
+	rP.Anchored = true
+	rP.Position = newModel:GetBoundingBox().Position
+	rP.Parent = newModel
+	newModel.PrimaryPart = rP
+	newModel:PivotTo(CFrame.new(base.PrimaryPart.CFrame.Position) * newModel:GetPivot().Rotation)
+	local rPClone = rP:Clone()
+	rPClone.Parent = game.Workspace
+	rP:Destroy()
+	rPClone.Position = newModel:GetBoundingBox().Position
+	rPClone.Parent = newModel
+	rPClone.Transparency = 1
+	rPClone.CanCollide = false
+	newModel.PrimaryPart = rPClone
+	newModel:PivotTo(CFrame.new(base.PrimaryPart.CFrame.Position) * CFrame.new(0, newModel:GetExtentsSize().Y/2, 0))
+	return newModel
+end
+
+
+function module.stageSetup(room)
+	room:SetAttribute("Setup", false)
+	if room:FindFirstChild("Folder", true) then
+		room.Folder:Destroy()
+	end
+	local newFolder = Instance.new("Folder")
+	newFolder.Parent = room
+	for i,v in ipairs(room.Bases:GetChildren()) do
+		local newModel = newModelSetup(v, newFolder, room)
+		for h,k in ipairs(v.Quadrants:GetChildren()) do
+			task.wait()
+			local ovrP = OverlapParams.new()
+			ovrP.FilterType = Enum.RaycastFilterType.Include
+			ovrP.FilterDescendantsInstances = {newModel}
+			local partTable = game.Workspace:GetPartsInPart(k.Part, ovrP)
+			if #partTable == 0 then
+				task.wait()
+				newModelSetup(k, newFolder, room)
+			end
+		end
+	end
+	room:SetAttribute("Setup", true)
+end
+
+return module
