@@ -1,0 +1,241 @@
+local module = {}
+
+local plyr = game:GetService("Players").LocalPlayer
+local plyrModule = require(plyr:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"))
+local camera = game.Workspace.CurrentCamera
+
+local rE = game:GetService("ReplicatedStorage")
+local uIS = game:GetService("UserInputService")
+local cAS = game:GetService("ContextActionService")
+local rS = game:GetService("RunService")
+local events = rE:FindFirstChild("Events")
+
+local bGUI = script.BillboardGui
+local dashDistance = 100
+
+local function hitBox()
+	local char = plyr.Character
+	local humRP = char:FindFirstChild("HumanoidRootPart")
+	local part = Instance.new("Part")
+	part.Parent = char
+	part.Size = Vector3.new(10,10,10)
+	part.CanCollide = false
+	part.Massless = true
+	part.CFrame = humRP.CFrame * CFrame.new(0,1,-5)
+	part.Transparency = 1
+	local weld = Instance.new("WeldConstraint")
+	weld.Parent = char
+	weld.Part0 = humRP
+	weld.Part1 = part
+	return part
+end
+
+local function potentialTargets(part)
+	local plyrs = {}
+	local ovrPrm = OverlapParams.new()
+	ovrPrm.FilterType = Enum.RaycastFilterType.Exclude
+	ovrPrm.FilterDescendantsInstances = {plyr.Character}
+	local array = game.Workspace:GetPartsInPart(part, ovrPrm)
+	for i,v in pairs(array) do
+		if v.Name == "HumanoidRootPart" then
+			if table.find(plyrs, v.Parent) == nil then
+				table.insert(plyrs, v.Parent)
+			end
+		end
+	end
+	return plyrs
+end
+
+local function setTarget(target, v)
+	if target.Value == nil then
+		target.Value = v
+	else
+		if plyr:DistanceFromCharacter(v.PrimaryPart.CFrame.Position) < plyr:DistanceFromCharacter(target.Value.PrimaryPart.CFrame.Position) then
+			target.Value = v
+		end
+	end
+end
+
+local function getTargets(part)
+	local plyrs = potentialTargets(part)
+	if #plyrs < 1 then return end
+	local char = plyr.Character
+	local allyTarget = char:FindFirstChild("GameStatus"):FindFirstChild("Ally")
+	local enemyTarget = char:FindFirstChild("GameStatus"):FindFirstChild("Enemy")
+	allyTarget.Value = nil
+	enemyTarget.Value = nil
+	for i,v in pairs(plyrs) do
+		if char:FindFirstChild("GameStatus"):GetAttribute("Team") == v:FindFirstChild("GameStatus"):GetAttribute("Team") then
+			setTarget(allyTarget, v)
+		else
+			setTarget(enemyTarget, v)
+		end
+	end
+end
+
+local function punch(event, inputState, inputObj)
+	local gameStatus = plyr.Character:FindFirstChild("GameStatus")
+	if inputState ~= Enum.UserInputState.Begin or gameStatus:FindFirstChild("Enemy").Value == nil or gameStatus:GetAttribute("KO") or 
+		gameStatus:GetAttribute("Punch") or gameStatus:GetAttribute("Rez") or gameStatus:GetAttribute("Rezzing") 
+	then return end
+	events:FindFirstChild("Punch"):FireServer(gameStatus:FindFirstChild("Enemy").Value)
+end
+--Player KO
+--Player Punch
+--Player Rez
+--Player Rezzing
+
+local function rez(event, inputState, inputObj)
+	local gameStatus = plyr.Character:FindFirstChild("GameStatus")
+	if inputState ~= Enum.UserInputState.Begin or gameStatus:FindFirstChild("Ally").Value == nil or gameStatus:GetAttribute("KO") or 
+		gameStatus:GetAttribute("Punch") or gameStatus:GetAttribute("Rez") or gameStatus:GetAttribute("Rezzing") 
+	then return end
+	local ally = gameStatus:FindFirstChild("Ally").Value
+	if not ally:FindFirstChild("GameStatus"):GetAttribute("KO") or ally:FindFirstChild("GameStatus"):GetAttribute("Rezzing") then return end
+	events:FindFirstChild("Rez"):FireServer(ally)
+end
+--Player KO
+--Player Punch
+--Player Rez
+--Player Rezzing
+--Ally KO
+--Ally Rezzing
+
+local function dashSetup()
+	local humRP = plyr.Character:FindFirstChild("HumanoidRootPart")
+	local rayPart = Instance.new("Part")
+	rayPart.Name = "RayPart"
+	rayPart.Parent = plyr.Character
+	rayPart.CanCollide = false
+	rayPart.Massless = true
+	rayPart.Transparency = 1
+	local endPart = Instance.new("Part")
+	endPart.Name = "EndPart"
+	endPart.Parent = game.Workspace
+	endPart.CanCollide = false
+	endPart.Massless = true
+	endPart.Transparency = 1
+	endPart.Size = Vector3.new(3, 3, .1)
+	endPart.CFrame = humRP.CFrame * CFrame.new(0, 0, -dashDistance)
+	local weld1 = Instance.new("WeldConstraint")
+	weld1.Parent = rayPart
+	weld1.Part0 = humRP
+	weld1.Part1 = rayPart
+	local weld2 = Instance.new("WeldConstraint")
+	weld2.Parent = endPart
+	weld2.Part0 = humRP
+	weld2.Part1 = endPart
+	local rayPrm = RaycastParams.new()
+	rayPrm.FilterDescendantsInstances = {plyr.Character}
+	rayPrm.FilterType = Enum.RaycastFilterType.Exclude
+	return rayPart, weld1, rayPrm, endPart
+end
+
+local function changeRayPart(origin, result, rayPart, x, y)
+	local distance = (origin - result.Position).Magnitude
+	rayPart.Size = Vector3.new(x, y, distance)
+	rayPart.CFrame = CFrame.lookAt(origin, result.Position) * CFrame.new(0, 0, -distance/2)
+end
+
+local function getDashTarget(rayPart, weld1, rayPrm, endPart)
+	local char = plyr.Character
+	local dashTarget = char:FindFirstChild("GameStatus"):FindFirstChild("Dash")
+	local origin = char:FindFirstChild("HumanoidRootPart").CFrame.Position
+	local result = game.Workspace:Raycast(origin, camera.CFrame.LookVector * dashDistance, rayPrm)
+	if not result then return end
+	weld1.Enabled = false
+	local function areaCheck()
+		local plyrsIn = potentialTargets(rayPart)
+		if #plyrsIn == 0 then
+			dashTarget.Value = nil
+		elseif #plyrsIn == 1 then
+			dashTarget.Value = plyrsIn[1]
+		else
+			for i,v in pairs(plyrsIn) do
+				setTarget(dashTarget, v)
+			end
+		end
+	end
+	if result.Instance == endPart then
+		changeRayPart(origin, result, rayPart, 20, 5)
+		areaCheck()
+	else
+		if result.Instance.Parent:FindFirstChild("HumanoidRootPart") ~= nil then
+			changeRayPart(origin, result, rayPart, .1, .1)
+			dashTarget.Value =  result.Instance.Parent
+		elseif result.Instance.Parent.Parent:FindFirstChild("HumanoidRootPart") ~= nil then
+			changeRayPart(origin, result, rayPart, .1, .1)
+			dashTarget.Value =  result.Instance.Parent.Parent
+		else
+			changeRayPart(origin, result, rayPart, 20, 5)
+			areaCheck()
+		end
+	end
+	weld1.Enabled = true
+	if dashTarget.Value ~= nil then
+		bGUI.Parent = dashTarget.Value
+		if plyr:DistanceFromCharacter(char:FindFirstChild("GameStatus"):FindFirstChild("Dash").Value.PrimaryPart.CFrame.Position) < 5 then
+			char:FindFirstChild("AlignPosition").Enabled = false
+			char:FindFirstChild("LinearVelocity").Enabled = true
+			char:FindFirstChild("GameStatus"):SetAttribute("Dash", false)
+		end
+	else
+		bGUI.Parent = script
+		char:FindFirstChild("AlignPosition").Attachment1 = nil
+		char:FindFirstChild("AlignPosition").Enabled = false
+		char:FindFirstChild("LinearVelocity").Enabled = true
+		char:FindFirstChild("GameStatus"):SetAttribute("Dash", false)
+	end
+end
+
+
+local function dash(event, inputState, inputObj)
+	local char = plyr.Character
+	if inputState ~= Enum.UserInputState.Begin or char:FindFirstChild("GameStatus"):GetAttribute("KO") or char:FindFirstChild("GameStatus"):GetAttribute("Rez") or 
+		char:FindFirstChild("GameStatus"):GetAttribute("Rezzing") then
+		char:FindFirstChild("AlignPosition").Enabled = false
+		char:FindFirstChild("LinearVelocity").Enabled = true
+		char:FindFirstChild("GameStatus"):SetAttribute("Dash", false)
+		return
+	else
+		if char:FindFirstChild("GameStatus"):FindFirstChild("Dash").Value == nil then return end
+		char:FindFirstChild("AlignPosition").Attachment1 = char:FindFirstChild("GameStatus"):FindFirstChild("Dash").Value:FindFirstChild("HumanoidRootPart"):FindFirstChild("RootAttachment")
+		char:FindFirstChild("AlignPosition").Enabled = true
+		char:FindFirstChild("LinearVelocity").Enabled = false
+		char:FindFirstChild("GameStatus"):SetAttribute("Dash", true)
+	end
+end
+--Player KO
+--Player Rez
+--Player Rezzing
+--No Dash Target
+--Reached Target
+
+local function getControls()
+	cAS:BindAction("Punch", punch, true, Enum.KeyCode.F)
+	cAS:BindAction("Rez", rez, true, Enum.KeyCode.E)
+	cAS:BindAction("Dash", dash, true, Enum.KeyCode.LeftShift)
+end
+
+local function stopControls()
+	cAS:UnbindAction("Punch")
+	cAS:UnbindAction("Rez")
+	cAS:UnbindAction("Dash")
+end
+
+function module.startGame()
+	getControls()
+	local part = hitBox()
+	local rayPart, weld1, rayPrm, endPart = dashSetup()
+	rS:BindToRenderStep("GetTargets", 1, function()
+		getTargets(part)
+		getDashTarget(rayPart, weld1, rayPrm, endPart)
+	end)
+end
+
+function module.stopGame()
+	stopControls()
+	rS:UnbindFromRenderStep("GetTargets")
+end
+
+return module
