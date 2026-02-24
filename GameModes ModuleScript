@@ -1,0 +1,125 @@
+local gameModes = {
+	
+	["Classic"] = {
+		["Game"] = {
+			["Lives"] = 3,
+			["Steal"] = false,
+			["Confirmed"] = false,
+			["Freeze"] = false,
+			["Deathmatch"] = false,
+			["TPP1"] = false,
+			["TPP2"] = true,
+			["Score"] = "Tags",
+		},
+		["OT"] = {
+			["Lives"] = 1,
+			["Steal"] = false,
+			["Confirmed"] = false,
+			["Freeze"] = false,
+			["Deathmatch"] = false,
+			["TPP1"] = false,
+			["TPP2"] = false,
+			["Score"] = "Tags",
+		},
+		["Image"] = "rbxassetid://113892218263865",
+	},
+	
+	["Tag Confirmed"] = {
+		["Game"] = {
+			["Lives"] = 3,
+			["Steal"] = false,
+			["Confirmed"] = true,
+			["Freeze"] = false,
+			["Deathmatch"] = true,
+			["TPP1"] = true,
+			["TPP2"] = true,
+			["Score"] = "Confirms",
+		},
+		["OT"] = {
+			["Lives"] = nil,
+			["Steal"] = false,
+			["Confirmed"] = false,
+			["Freeze"] = false,
+			["Deathmatch"] = false,
+			["TPP1"] = false,
+			["TPP2"] = true,
+			["Score"] = "Confirms",
+		},
+		["Image"] = "rbxassetid://133916853815747",
+	},
+	
+	["Soul Steal"] = {
+		["Game"] = {
+			["Lives"] = 2,
+			["Steal"] = true,
+			["Confirmed"] = false,
+			["Freeze"] = false,
+			["Deathmatch"] = false,
+			["TPP1"] = false,
+			["TPP2"] = true,
+			["Score"] = "Lives",
+		},
+		["OT"] = {
+			["Lives"] = nil,
+			["Steal"] = false,
+			["Confirmed"] = false,
+			["Freeze"] = false,
+			["Deathmatch"] = false,
+			["TPP1"] = false,
+			["TPP2"] = true,
+			["Score"] = "Lives",
+		},
+		["Image"] = "rbxassetid://121626792614251",
+	},
+	
+	["Freeze Tag"] = {
+		["Game"] = {
+			["Lives"] = 1,
+			["Steal"] = false,
+			["Confirmed"] = false,
+			["Freeze"] = true,
+			["Deathmatch"] = true,
+			["TPP1"] = false,
+			["TPP2"] = false,
+			["Score"] = "Tags",
+		},
+		["OT"] = {
+			["Lives"] = 1,
+			["Steal"] = false,
+			["Confirmed"] = false,
+			["Freeze"] = false,
+			["Deathmatch"] = false,
+			["TPP1"] = false,
+			["TPP2"] = false,
+			["Score"] = "Tags",
+		},
+		["Image"] = "rbxassetid://101301481180120",
+	},
+	
+	["Deathmatch"] = {
+		["Game"] = {
+			["Lives"] = 1,
+			["Steal"] = false,
+			["Confirmed"] = false,
+			["Freeze"] = false,
+			["Deathmatch"] = true,
+			["TPP1"] = false,
+			["TPP2"] = true,
+			["Score"] = "Tags",
+		},
+		["OT"] = {
+			["Lives"] = 3,
+			["Steal"] = false,
+			["Confirmed"] = false,
+			["Freeze"] = false,
+			["Deathmatch"] = false,
+			["TPP1"] = false,
+			["TPP2"] = true,
+			["Score"] = "Tags",
+		},
+		["Image"] = "rbxassetid://115558931247131",
+	},
+	
+}
+
+return gameModes
