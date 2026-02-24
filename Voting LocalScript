@@ -1,0 +1,318 @@
+local tS = game:GetService("TweenService")
+local rS = game:GetService("ReplicatedStorage")
+local rE = rS:WaitForChild("Events")
+local sendVoteEvent = rE:WaitForChild("SendVote")
+local svfBind = rE:WaitForChild("ShowVoteFrame")
+
+local guiMessage = rS:WaitForChild("GUI")
+local guiVote = guiMessage:WaitForChild("Vote")
+local gvGM = guiVote:WaitForChild("GameModes")
+local gvC = guiVote:WaitForChild("Colors")
+local gvT = guiVote:WaitForChild("Teams")
+
+local voteFrame = script.Parent.Frame
+local teamSelect = voteFrame.TeamSelect
+local ffaButton = teamSelect.FFA
+local teamsButton = teamSelect.Teams
+local switch = teamSelect.Switch
+local textButton = teamSelect.TextButton
+local gmButtons = {voteFrame.GM1, voteFrame.GM2, voteFrame.GM3}
+local colorButtons = {voteFrame.C1, voteFrame.C2, voteFrame.C3}
+local selectionColors = {script.Selected, script.Unselected, script.Hovered}
+
+local team = nil
+local gm = 0
+local color = 0
+local hoverBool = false
+
+local function selectTeam(bool)
+	team = bool
+	hoverBool = true
+	ffaButton.Active = false
+	ffaButton.ImageTransparency = 1
+	teamsButton.Active = false
+	teamsButton.ImageTransparency = 1
+	switch.Active = true
+	textButton.Active = true
+	textButton.ZIndex = 4
+	local pos = UDim2.new()
+	local anchor = Vector2.new()
+	if bool then
+		switch.AnchorPoint = Vector2.new(1,0.5)
+		switch.Position = UDim2.new(0,0,.5,0)
+		anchor = Vector2.new(0,0.5)
+		sendVoteEvent:FireServer("T",1)
+	else
+		switch.AnchorPoint = Vector2.new(0,0.5)
+		switch.Position = UDim2.new(1,0,.5,0)
+		anchor = Vector2.new(1,0.5)
+		sendVoteEvent:FireServer("T",2)
+	end
+	local tween = tS:Create(switch, TweenInfo.new(.3, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut), {AnchorPoint = anchor})
+	tween:Play()
+end
+
+local function hoverTeam(v, bool)
+	if hoverBool then return end
+	if bool then
+		v.ImageTransparency = .2
+	else
+		v.ImageTransparency = 1
+	end
+end
+
+local function switchTeam()
+	team = not team
+	local pos = UDim2.new()
+	local anchor = Vector2.new()
+	if team then
+		pos = UDim2.new(0,0,.5,0)
+		anchor = Vector2.new(0,0.5)
+		sendVoteEvent:FireServer("T",1)
+	else
+		pos = UDim2.new(1,0,.5,0)
+		anchor = Vector2.new(1,0.5)
+		sendVoteEvent:FireServer("T",2)
+	end
+	local tween = tS:Create(switch, TweenInfo.new(.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.In), {Position = pos, AnchorPoint = anchor})
+	tween:Play()
+end
+
+ffaButton.Activated:Connect(function()
+	selectTeam(false)
+end)
+
+ffaButton.MouseEnter:Connect(function()
+	hoverTeam(ffaButton, true)
+end)
+
+ffaButton.MouseLeave:Connect(function()
+	hoverTeam(ffaButton, false)
+end)
+
+
+teamsButton.Activated:Connect(function()
+	selectTeam(true)
+end)
+
+teamsButton.MouseEnter:Connect(function()
+	hoverTeam(teamsButton, true)
+end)
+
+teamsButton.MouseLeave:Connect(function()
+	hoverTeam(teamsButton, false)
+end)
+
+textButton.Activated:Connect(switchTeam)
+
+textButton.MouseEnter:Connect(function()
+	if not hoverBool then return end
+	teamSelect.UIGradient.Color = selectionColors[3].Color
+end)
+
+textButton.MouseLeave:Connect(function()
+	if not hoverBool then return end
+	teamSelect.UIGradient.Color = selectionColors[2].Color
+end)
+
+local function selectButton(v, num, t, vote, voteType)
+	if vote ~= num then
+		if vote > 0 then
+			local oldVote = voteFrame:FindFirstChild(voteType..tostring(vote))
+			for h,k in ipairs(oldVote:GetDescendants()) do
+				if k:IsA("UIGradient") then
+					k.Color = selectionColors[2].Color
+				end
+			end
+		end
+		for h,k in ipairs(t) do
+			k.UIGradient.Color = selectionColors[1].Color
+		end
+		sendVoteEvent:FireServer(voteType, num)
+		return num
+	end
+end
+
+local function hoverButton(v, vote, t, bool, num)
+	local size = UDim2.new(num,0,num,0)
+	if v:GetAttribute("Choice") ~= vote then
+		if bool then
+			for h,k in ipairs(t) do
+				k.UIGradient.Color = selectionColors[3].Color
+			end
+		else
+			for h,k in ipairs(t) do
+				k.UIGradient.Color = selectionColors[2].Color
+			end
+		end
+	end
+	local tween = tS:Create(v, TweenInfo.new(.1, Enum.EasingStyle.Linear, Enum.EasingDirection.In), {Size = size})
+	tween:Play()
+end
+
+for i,v in ipairs(gmButtons) do
+	local choice = v:GetAttribute("Choice")
+	local t = {v, v.Divider}
+	v.Activated:Connect(function()
+		gm = selectButton(v, choice, t, gm, "GM")
+	end)
+	v.MouseEnter:Connect(function()
+		hoverButton(v, gm, t, true, .55)
+	end)
+	v.MouseLeave:Connect(function()
+		hoverButton(v, gm, t, false, .5)
+	end)
+end
+
+for i,v in ipairs(colorButtons) do
+	local choice = v:GetAttribute("Choice")
+	local t = {v.UIStroke}
+	v.Votes.Activated:Connect(function()
+		color = selectButton(v, choice, t, color, "C")
+	end)
+	v.Votes.MouseEnter:Connect(function()
+		hoverButton(v, color, t, true, .14)
+	end)
+	v.Votes.MouseLeave:Connect(function()
+		hoverButton(v, color, t, false, .125)
+	end)
+end
+
+
+local function visConents(bool)
+	for i,v in pairs(gmButtons) do
+		v.Visible = bool
+	end
+	teamSelect.Visible = bool
+end
+
+local function voteTrans(bool)
+	local startPos = UDim2.new()
+	local startSize = UDim2.new()
+	local newPos = UDim2.new()
+	local newSize = UDim2.new()
+	if bool then
+		startPos = UDim2.new(.5,0,.25,0)
+		startSize = UDim2.new(.05,0,.05,0)
+		newPos = UDim2.new(.5,0,.5,0)
+		newSize = UDim2.new(.5,0,.5,0)
+	else
+		startPos = UDim2.new(.5,0,.5,0)
+		startSize = UDim2.new(.5,0,.5,0)
+		newPos = UDim2.new(.5,0,.25,0)
+		newSize = UDim2.new(.05,0,.05,0)
+	end
+	voteFrame.Position = startPos
+	voteFrame.Size = startSize
+	local tween = tS:Create(voteFrame, TweenInfo.new(.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.In), {Position = newPos, Size = newSize})
+	if bool then
+		voteFrame.Visible = bool
+		tween:Play()
+		task.wait(.25)
+		visConents(bool)
+	else
+		tween:Play()
+		task.wait(.25)
+		visConents(bool)
+		task.wait(.25)
+		voteFrame.Visible = bool
+	end
+end
+
+local function reset()
+	for i,v in ipairs(gmButtons) do
+		v.UIGradient.Color = selectionColors[2].Color
+		v.Divider.UIGradient.Color = selectionColors[2].Color
+	end
+	for i,v in ipairs(colorButtons) do
+		v.UIStroke.UIGradient.Color = selectionColors[2].Color
+	end
+	switch.AnchorPoint = Vector2.new(1,.5)
+	switch.Position = UDim2.new(0,0,.5,0)
+	ffaButton.Active = true
+	ffaButton.ImageTransparency = 1
+	teamsButton.Active = true
+	teamsButton.ImageTransparency = 1
+	textButton.Active = false
+	switch.Active = false
+	textButton.ZIndex = 0
+	hoverBool = false
+	team = false
+	gm = 0
+	color = 0
+end
+
+local function setupGui()
+	local bool = guiVote:GetAttribute("Voting")
+	if bool then
+		voteFrame.Position = UDim2.new(.5,0,.5,0)
+		voteFrame.Size = UDim2.new(.5,0,.5,0)
+		for i,v in ipairs(gvC:GetChildren()) do
+			colorButtons[i].Primary.BackgroundColor3 = v:GetAttribute("Primary")
+			colorButtons[i].Secondary.BackgroundColor3 = v:GetAttribute("Secondary")
+			colorButtons[i].Highlight.BackgroundColor3 = v:GetAttribute("Highlight")
+			colorButtons[i].Votes.Text = v:GetAttribute("Votes")
+		end
+		for i,v in ipairs(gvGM:GetChildren()) do
+			gmButtons[i].ImageLabel.Image = v:GetAttribute("Image")
+			gmButtons[i].TextLabel.Text = v:GetAttribute("GameMode")
+			gmButtons[i].Votes.Text = v:GetAttribute("Votes")
+		end
+		voteFrame.TeamsVotes.Text = gvT:GetAttribute("Teams")
+		voteFrame.FFAVotes.Text = gvT:GetAttribute("FFA")
+	else
+		voteFrame.Position = UDim2.new(.5,0,.25,0)
+		voteFrame.Size = UDim2.new(.05,0,.05,0)
+	end
+	voteFrame.Visible = bool
+end
+
+svfBind.Event:Connect(function(bool)
+	if bool then
+		reset()
+		voteTrans(bool)
+	end
+end)
+
+guiVote:GetAttributeChangedSignal("Voting"):Connect(function()
+	local bool = guiVote:GetAttribute("Voting")
+	if not bool then
+		voteTrans(bool)
+		svfBind:Fire(bool)
+	end
+end)
+
+for i,v in ipairs (gvC:GetChildren()) do
+	v:GetAttributeChangedSignal("Primary"):Connect(function()
+		colorButtons[i].Primary.BackgroundColor3 = v:GetAttribute("Primary")
+	end)
+	v:GetAttributeChangedSignal("Secondary"):Connect(function()
+		colorButtons[i].Secondary.BackgroundColor3 = v:GetAttribute("Secondary")
+	end)
+	v:GetAttributeChangedSignal("Highlight"):Connect(function()
+		colorButtons[i].Highlight.BackgroundColor3 = v:GetAttribute("Highlight")
+	end)
+	v:GetAttributeChangedSignal("Votes"):Connect(function()
+		colorButtons[i].Votes.Text = v:GetAttribute("Votes")
+	end)
+end
+
+for i,v in pairs(gvGM:GetChildren()) do
+	v:GetAttributeChangedSignal("Image"):Connect(function()
+		gmButtons[i].ImageLabel.Image = v:GetAttribute("Image")
+	end)
+	v:GetAttributeChangedSignal("GameMode"):Connect(function()
+		gmButtons[i].TextLabel.Text = v:GetAttribute("GameMode")
+	end)
+	v:GetAttributeChangedSignal("Votes"):Connect(function()
+		gmButtons[i].Votes.Text = v:GetAttribute("Votes")
+	end)
+end
+
+for i,v in ipairs(gvT:GetChildren()) do
+	v:GetAttributeChangedSignal("Votes"):Connect(function()
+		voteFrame[v.Name].Text = v:GetAttribute("Votes")
+	end)
+end
+
+setupGui()
