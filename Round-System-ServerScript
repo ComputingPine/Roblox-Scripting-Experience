@@ -1,0 +1,512 @@
+local room = game.Workspace.Stage.Room
+local lobby = game.Workspace.Lobby
+
+local plyrs = game:GetService("Players")
+local tS = game:GetService("TweenService")
+local cS = game:GetService("CollectionService")
+local sSS = game:GetService("ServerScriptService")
+local rS = game:GetService("ReplicatedStorage")
+
+local gameModes = require(sSS:FindFirstChild("GameModes"))
+local colors = require(sSS:FindFirstChild("Colors"))
+local procGen = require(sSS:FindFirstChild("ProceduralGeneration"))
+
+local rE =rS:FindFirstChild("Events")
+local sendVoteEvent = rE:FindFirstChild("SendVote")
+local tcEvent = rE:FindFirstChild("ToggleControls")
+local tmEvent = rE:FindFirstChild("ToggleMovement")
+local rmEvent = rE:FindFirstChild("ResetMovement")
+local gtEvent = rE:FindFirstChild("GUITransition")
+local tagEvent = rE:FindFirstChild("Tag")
+local cdEvent = rE:FindFirstChild("CountDown")
+
+local guiMessage = rS:FindFirstChild("GUI")
+local guiVote = guiMessage:FindFirstChild("Vote")
+local gvC = guiVote:FindFirstChild("Colors")
+local gvGM = guiVote:FindFirstChild("GameModes")
+local gvT = guiVote:FindFirstChild("Teams")
+local guiGame = guiMessage:FindFirstChild("Game")
+
+local intWait, voteWait, gameWait, otWait, transWait = 5,10,60,30,1.5
+
+local function timer(num, bool)
+	for i = num, 0, -1 do
+		guiMessage:SetAttribute("Timer", tostring(i))
+		task.wait(1)
+		if bool then
+			if #cS:GetTagged("InGame") <= 1 or room:GetAttribute("End") then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function int()
+	local num = 0
+	local text = ""
+	while true do
+		if num%4 == 0 then
+			text = ""
+		elseif num%4 == 1 then
+			text = "."
+		elseif num%4 == 2 then
+			text = ".."
+		elseif num%4 == 3 then
+			text = "..."
+		end
+		num+=1
+		guiMessage:SetAttribute("Timer", text)
+		task.wait(2/3)
+	end
+end
+
+local function serverMessage(strng)
+	guiMessage:SetAttribute("ServerMessage", strng)
+	task.wait(3)
+	guiMessage:SetAttribute("ServerMessage", "")
+end
+
+local function countDown()
+	for i = 3, 1, -1 do
+		cdEvent:FireAllClients(true, tostring(i))
+		task.wait(1)
+	end
+	cdEvent:FireAllClients(false, "")
+end
+
+local function randTable(t)
+	local copyT = {}
+	for i,v in pairs(t) do
+		table.insert(copyT,i)
+	end
+	local randT = {}
+	for i = 1, 3 do
+		local rand = copyT[math.random(1, #copyT)]
+		table.insert(randT, rand)
+		local num = table.find(copyT, rand)
+		table.remove(copyT, num)
+	end
+	return randT
+end
+
+local function sortAttribute(num1, num2, num3)
+	if num1 > num2 and num1 > num3 then
+		return 1
+	elseif num2 > num1 and num2 > num3 then
+		return 2
+	elseif num3 > num1 and num3 > num2 then
+		return 3
+	elseif num1 == num2 and num1 > num3 then
+		if math.random() < 0.5 then
+			return 1
+		else
+			return 2
+		end
+	elseif num1 == num3 and num1 > num2 then
+		if math.random() < 0.5 then
+			return 1
+		else
+			return 3
+		end
+	elseif num2 == num3 and num2 > num1 then
+		if math.random() < 0.5 then
+			return 2
+		else
+			return 3
+		end
+	else
+		return math.random(1,3)
+	end
+end
+
+local function twoChoice(num1, num2)
+	if num1 > num2 then
+		return true
+	elseif num2 > num1 then
+		return false
+	else
+		return math.random() < 0.5
+	end
+end
+
+local function setupVote()
+	local gmChoice = randTable(gameModes)
+	local colorChoice = randTable(colors)
+	for i,v in ipairs(gvGM:GetChildren()) do
+		v:SetAttribute("GameMode", gmChoice[i])
+		v:SetAttribute("Image", gameModes[gmChoice[i]]["Image"])
+		v:SetAttribute("Votes", 0)
+	end
+	for i,v in ipairs(gvC:GetChildren()) do
+		v:SetAttribute("Primary", colors[colorChoice[i]]["Primary"])
+		v:SetAttribute("Secondary", colors[colorChoice[i]]["Secondary"])
+		v:SetAttribute("Highlight", colors[colorChoice[i]]["Highlight"])
+		v:SetAttribute("Votes", 0)
+	end
+	for i,v in ipairs(gvT:GetChildren()) do
+		v:SetAttribute("Votes", 0)
+	end
+	return gmChoice, colorChoice
+end
+
+local function setupTeams(bool)
+	local leftT = guiGame.Left:GetChildren()
+	local rightT = guiGame.Right:GetChildren()
+	for i,v in ipairs(plyrs:GetPlayers()) do
+		local num = (i%2)+1
+		if bool then
+			v:SetAttribute("Team", num)
+		else
+			v:SetAttribute("Team", i)
+		end
+		if num == 1 then
+			leftT[1].Value = v
+			table.remove(leftT, 1)
+		elseif num == 2 then
+			rightT[1].Value = v
+			table.remove(rightT, 1)
+		end
+	end
+end
+
+local voteT = {}
+local function vote()
+	local gmChoice, colorChoice = setupVote()
+	guiVote:SetAttribute("Voting", true)
+	task.spawn(serverMessage, "Vote!")
+	timer(voteWait, false)
+	guiVote:SetAttribute("Voting", false)
+	voteT = {}
+	local gm = gmChoice[sortAttribute(gvGM:FindFirstChild("GM1"):GetAttribute("Votes"), gvGM:FindFirstChild("GM2"):GetAttribute("Votes"), gvGM:FindFirstChild("GM3"):GetAttribute("Votes"))]
+	room:SetAttribute("GM", gm)
+	room:SetAttribute("GameState", "Game")
+	room:SetAttribute("Freeze", gameModes[gm]["Game"]["Freeze"])
+	local color = colorChoice[sortAttribute(gvC:FindFirstChild("C1"):GetAttribute("Votes"), gvC:FindFirstChild("C2"):GetAttribute("Votes"), gvC:FindFirstChild("C3"):GetAttribute("Votes"))]
+	room:SetAttribute("Primary", colors[color]["Primary"])
+	room:SetAttribute("Secondary", colors[color]["Secondary"])
+	room:SetAttribute("Highlight", colors[color]["Highlight"])
+	room:SetAttribute("GM", gm)
+	local bool = twoChoice(gvT:FindFirstChild("T1"):GetAttribute("Votes"), gvT:FindFirstChild("T2"):GetAttribute("Votes"))
+	guiGame:SetAttribute("Teams", bool)
+	local tweenInfo = TweenInfo.new(3, Enum.EasingStyle.Linear, Enum.EasingDirection.Out, 0, false, 0)
+	local tweenPrimaryColor = {Color = colors[color]["Primary"]}
+	local tweenSecondaryColor = {Color = colors[color]["Secondary"]}
+	for i,v in pairs(cS:GetTagged("Base")) do
+		local tween = tS:Create(v, tweenInfo, tweenPrimaryColor)
+		tween:Play()
+	end
+	for i,v in pairs(cS:GetTagged("Neon")) do
+		local tween = tS:Create(v, tweenInfo, tweenSecondaryColor)
+		tween:Play()
+	end
+	for i,v in pairs(cS:GetTagged("Emitter")) do
+		v.Color = ColorSequence.new(colors[color]["Secondary"])
+	end
+	setupTeams(bool)
+	task.wait(3)
+	guiGame:SetAttribute("Game", true)
+	return gm, bool
+end
+
+local function castVote(plyr, strng, num)
+	if not guiVote:GetAttribute("Voting") then return end
+	if voteT[plyr.Name] == nil then
+		voteT[plyr.Name] = {}
+	end
+	if voteT[plyr.Name][strng] == nil then
+		voteT[plyr.Name][strng] = num
+		local group
+		if strng == "C" then
+			group = gvC
+		elseif strng == "GM" then
+			group = gvGM
+		elseif strng == "T" then
+			group = gvT
+		end
+		local fold = group:FindFirstChild(strng..tostring(num))
+		fold:SetAttribute("Votes", fold:GetAttribute("Votes") + 1)
+	else
+		if voteT[plyr.Name][strng] ~= num then
+			local oldVote = voteT[plyr.Name][strng]
+			voteT[plyr.Name][strng] = num
+			local group
+			if strng == "C" then
+				group = gvC
+			elseif strng == "GM" then
+				group = gvGM
+			elseif strng == "T" then
+				group = gvT
+			end
+			local oldFold = group:FindFirstChild(strng..tostring(oldVote))
+			local fold = group:FindFirstChild(strng..tostring(num))
+			oldFold:SetAttribute("Votes", oldFold:GetAttribute("Votes") - 1)
+			fold:SetAttribute("Votes", fold:GetAttribute("Votes") + 1)
+		end
+	end
+end
+
+sendVoteEvent.OnServerEvent:Connect(castVote)
+
+local function overtime(gm,tm)
+	task.spawn(serverMessage, "Overtime!")
+	room:SetAttribute("GameState", "OT")
+	return timer(otWait, true)
+end
+
+local function startGame(gm)
+	room:SetAttribute("GameState", "Game")
+	tcEvent:FireAllClients(true)
+	tmEvent:FireAllClients(true)
+	local bool = timer(gameWait, true)
+	if not bool then
+		bool = overtime(gm)
+	end
+	return bool
+end
+
+local function randTeamSpawn(t)
+	local spawnPart = t[math.random(1, #t)]
+	local num = table.find(t, spawnPart)
+	table.remove(t, num)
+	return spawnPart, t
+end
+
+local function invisPlayer(plyr, num)
+	local tweenInfo = TweenInfo.new(transWait, Enum.EasingStyle.Linear, Enum.EasingDirection.Out, 0, false, 0)
+	local tT = {Transparency = num}
+	local crown = plyr.Crown.Value
+	for i,v in ipairs(plyr.Character:GetDescendants()) do
+		if v:IsA("Part") or v:IsA("MeshPart") or v:IsA("Decal") then
+			if v == plyr.Character.PrimaryPart then continue end
+			if v:IsDescendantOf(crown) then
+				if v == crown.PrimaryPart then continue end
+				if v:HasTag("Accent") then
+					if crown:GetAttribute("Tier") >= 1 then
+						local tween = tS:Create(v, tweenInfo, tT)
+						tween:Play()
+					end
+				else
+					local tween = tS:Create(v, tweenInfo, tT)
+					tween:Play()
+				end
+			else
+				local tween = tS:Create(v, tweenInfo, tT)
+				tween:Play()
+			end
+		end
+	end
+end
+
+local function togglePlayer(plyr, bool)
+	tcEvent:FireClient(plyr, bool)
+	tmEvent:FireClient(plyr, bool)
+end
+
+local function awayPlayer(plyr)
+	togglePlayer(plyr, false)
+	invisPlayer(plyr, 1)
+	--player away animation
+	task.wait(transWait)
+end
+
+local function arrivePlayer(plyr, spawnPart)
+	plyr.Character:MoveTo(spawnPart.Position)
+	plyr.Character.PrimaryPart.CFrame = CFrame.lookAt(plyr.Character.PrimaryPart.Position, room.PrimaryPart.Position)
+	invisPlayer(plyr, 0)
+	task.wait(transWait)
+	--character arrives animation
+end
+
+local function setupGame(tm)
+	local spawnT = {}
+	if tm then
+		spawnT["1"] = {}
+		spawnT["2"] = {}
+		for i,v in ipairs(room.Spawns:GetChildren()) do
+			local num = tonumber(v.Name)
+			if num%2 == 0 then
+				table.insert(spawnT["2"], v)
+			elseif num%2 == 1 then
+				table.insert(spawnT["1"], v)
+			end
+		end
+	else
+		spawnT = room.Spawns:GetChildren()
+	end
+	tmEvent:FireAllClients(false)
+	tcEvent:FireAllClients(false)
+	for i,v in pairs(plyrs:GetPlayers()) do
+		cS:AddTag(v, "InGame")
+		task.spawn(function()
+			awayPlayer(v)
+			gtEvent:FireClient(v, true)
+		end)
+	end
+	task.wait(transWait*2)
+	for i,v in pairs(cS:GetTagged("InGame")) do
+		local spawnPart
+		if tm then
+			print(spawnT)
+			print(room.Spawns:GetChildren())
+			if i%2 == 0 then
+				cS:AddTag(v, "Team2")
+				spawnPart, spawnT["2"] = randTeamSpawn(spawnT["2"])
+			elseif tm and i%2 == 1 then
+				cS:AddTag(v, "Team1")
+				spawnPart, spawnT["1"] = randTeamSpawn(spawnT["1"])
+			end
+		else
+			spawnPart = spawnT[i]
+		end
+		task.spawn(function()
+			gtEvent:FireClient(v, false)
+			v.Character:MoveTo(spawnPart.Position)
+			v.Character.PrimaryPart.CFrame = CFrame.lookAt(v.Character.PrimaryPart.Position, room.PrimaryPart.Position)
+			task.wait(transWait)
+			invisPlayer(v, 0)
+		end)
+	end
+	task.wait(transWait*2)
+end
+
+local function endGame()
+	local thread = task.spawn(int)
+	for i,v in pairs(cS:GetTagged("InGame")) do
+		task.spawn(function()
+			awayPlayer(v)
+			gtEvent:FireClient(v, true)
+		end)
+	end
+	task.wait(transWait*3)
+	for i,v in pairs(cS:GetTagged("InGame")) do
+		cS:RemoveTag(v, "InGame")
+		cS:RemoveTag(v, "Team1")
+		cS:RemoveTag(v, "Team2")
+		v.GameFolder:SetAttribute("Tagged", false)
+		task.spawn(function()
+			gtEvent:FireClient(v, false)
+			v.Character:MoveTo(lobby.PrimaryPart.Position)
+			v.Character.PrimaryPart.CFrame = CFrame.lookAt(v.Character.PrimaryPart.Position, room.PrimaryPart.Position)
+			task.wait(transWait)
+			invisPlayer(v, 0)
+			task.wait(transWait)
+			rmEvent:FireClient(v)
+		end)
+	end
+	task.wait(transWait*2)
+	task.cancel(thread)
+end
+
+tagEvent.OnServerEvent:Connect(function(plyr, target)
+	if not plyr:HasTag("InGame") or plyr.GameFolder:GetAttribute("Tagged") then return end
+	if not target or not target:IsA("Model") then return end
+	local dist = (plyr.Character.PrimaryPart.Position - target.PrimaryPart.Position).Magnitude
+	if dist > 5 then return end
+	local plyr2 = plyrs:GetPlayerFromCharacter(target)
+	if plyr2 and plyr2:HasTag("InGame") and not plyr2:HasTag("Immortal") then
+		local bool = false
+		local plyr2Tagged = plyr2.GameFolder:GetAttribute("Tagged")
+		local plyrTeam = 0
+		local plyr2Team = 3
+		if plyr:HasTag("Team1") then
+			plyrTeam = 1
+		end
+		if plyr:HasTag("Team2") then
+			plyrTeam = 2
+		end
+		if plyr2:HasTag("Team1") then
+			plyr2Team = 1
+		end
+		if plyr2:HasTag("Team2") then
+			plyr2Team = 2
+		end
+		local gSettings = gameModes[room:GetAttribute("GM")][room:GetAttribute("GameState")]
+		if gSettings["Freeze"] then
+			if plyrTeam == plyr2Team and plyr2Tagged then
+				bool = true
+			end
+		end
+		if plyrTeam ~= plyr2Team and not plyr2Tagged then
+			bool = true
+		end
+		if bool then
+			plyr2.GameFolder:SetAttribute("Tagged", not plyr2Tagged)
+			if gSettings["Steal"] and not plyr2Tagged then
+				plyr:SetAttribute("Lives", plyr.GameFolder:GetAttribute("Lives") + 1)
+			end
+			if gSettings["TPP1"] then
+				cS:AddTag(plyr, "Immortal")
+				local spawnT = room.Spawns:GetChildren()
+				awayPlayer(plyr)
+				arrivePlayer(plyr, spawnT[math.random(1, #spawnT)])
+				togglePlayer(plyr, true)
+				cS:RemoveTag(plyr, "Immortal")
+			end
+		end
+	end
+end)
+
+plyrs.PlayerAdded:Connect(function(plyr)
+	local gameFolder = plyr:WaitForChild("GameFolder")
+	gameFolder:GetAttributeChangedSignal("Tagged"):Connect(function()
+		if not plyr:HasTag("InGame") or plyr:HasTag("Immortal") then return end
+		local bool = gameFolder:GetAttribute("Tagged")
+		local gSettings = gameModes[room:GetAttribute("GM")][room:GetAttribute("GameState")]
+		if bool then
+			if gSettings["Freeze"] then
+				togglePlayer(plyr, false)
+				--freeze player
+			end
+			if gSettings["Confirmed"] then
+				--drop tag
+			end
+			if not gSettings["Deatmatch"] then
+				plyr:SetAttribute("Lives", gameFolder:GetAttribute("Lives") - 1)
+			end
+		else
+			if gSettings["Freeze"] then
+				togglePlayer(plyr, true)
+				--unfreeze player
+			end
+		end
+		if gSettings["TPP2"] then
+			cS:AddTag(plyr, "Immortal")
+			local spawnT = room.Spawns:GetChildren()
+			awayPlayer(plyr)
+			arrivePlayer(plyr, spawnT[math.random(1, #spawnT)])
+			togglePlayer(plyr, true)
+			plyr:SetAttribute("Tagged", false)
+			cS:RemoveTag(plyr, "Immortal")
+		end
+	end)
+end)
+
+while true do
+	local thread
+	if #plyrs:GetPlayers() < 2 then
+		thread = task.spawn(int)
+		task.spawn(serverMessage, "Waiting for More Players")
+	end
+	repeat wait() until #plyrs:GetPlayers() >= 1
+	if thread then
+		task.cancel(thread)
+		task.spawn(serverMessage, "")
+	end
+	timer(intWait, false)
+	local gm, tm = vote()
+	thread = task.spawn(int)
+	task.spawn(serverMessage,"Loading Stage...")
+	procGen.stageSetup(room)
+	setupGame(tm)
+	countDown()
+	task.cancel(thread)
+	local bool = startGame(gm)
+	--reward players
+	task.wait(1)
+	guiGame:SetAttribute("Game", false)
+	task.wait(1)
+	timer(3, false)
+	endGame()
+	--Show Rewards
+end
