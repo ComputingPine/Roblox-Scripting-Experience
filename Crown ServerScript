@@ -1,0 +1,39 @@
+local plyrs = game:GetService("Players")
+
+local sSS = game:GetService("ServerScriptService")
+local crownMod = require(sSS:WaitForChild("CrownModule"))
+
+local sS = game:GetService("ServerStorage")
+local crowns = sS:FindFirstChild("Crowns")
+
+local function equipCrown(plyr, char, strng)
+	local crown = crowns:FindFirstChild(strng):Clone()
+	crown.PrimaryPart.CFrame = char.Head.CFrame
+	crown.Parent = char
+	plyr.Crown.Value = crown
+	crown.PrimaryPart.CylindricalConstraint.Attachment0 = char.Head.CrownAttachment
+	return crown
+end
+
+plyrs.PlayerAdded:Connect(function(plyr)	
+	local crownVal = Instance.new("ObjectValue")
+	crownVal.Parent = plyr
+	crownVal.Name = "Crown"
+	local wearCrownFunc
+	crownVal.Changed:Connect(function()
+		if crownVal.Value then
+			crownMod.WearCrown(crownVal.Value)
+		end
+	end)
+	
+	plyr.CharacterAdded:Connect(function(char)
+		local head = char.Head
+		local attach = Instance.new("Attachment")
+		attach.Name = "CrownAttachment"
+		attach.CFrame = CFrame.new(head.HatAttachment.CFrame.Position) * CFrame.Angles(0,0,math.rad(90))
+		attach.Parent = head
+		
+		local crown = equipCrown(plyr, char, "Ace")
+	end)
+	
+end)
