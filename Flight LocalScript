@@ -1,0 +1,27 @@
+local plyr = game:GetService("Players").LocalPlayer
+local char = plyr.Character
+local humRP = char:WaitForChild("HumanoidRootPart")
+
+local rS = game:GetService("ReplicatedStorage")
+local bRE = rS:WaitForChild("Events"):WaitForChild("BeginRound")
+local eRE = rS:WaitForChild("Events"):WaitForChild("EndRound")
+local flyScript = require(rS:WaitForChild("Scripts"):WaitForChild("FlyScript"))
+local mechScript = require(rS:FindFirstChild("Scripts"):FindFirstChild("MechScript"))
+
+char:WaitForChild("LinearVelocity").Attachment0 = char:WaitForChild("HumanoidRootPart"):WaitForChild("RootAttachment")
+char:WaitForChild("AlignOrientation").Attachment0 = char:WaitForChild("HumanoidRootPart"):WaitForChild("RootAttachment")
+char:WaitForChild("AlignPosition").Attachment0 = humRP:FindFirstChild("RootAttachment")
+
+flyScript.VoluntaryFlight()
+
+bRE.OnClientEvent:Connect(function()
+	flyScript.ForceFlight()
+	mechScript.startGame()
+end)
+
+eRE.OnClientEvent:Connect(function()
+	mechScript.stopGame()
+	wait(5)
+	flyScript.VoluntaryFlight()
+end)
+
