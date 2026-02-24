@@ -1,0 +1,87 @@
+local players = game:GetService("Players")
+local rE = game:GetService("ReplicatedStorage")
+
+local events = rE:FindFirstChild("Events")
+
+local function startRD(char)
+	local socketTable = {}
+	for _,v in pairs(char:GetDescendants()) do
+		if v:IsA("Motor6D") then
+			local socket = Instance.new("BallSocketConstraint")
+			local a0 = Instance.new("Attachment")
+			local a1 = Instance.new("Attachment")
+			a0.Name = "TEMP"
+			a1.Name = "TEMP"
+			socket.Parent = v.Parent
+			a0.Parent = v.Part0
+			a1.Parent = v.Part1
+			socket.Attachment0 = a0
+			socket.Attachment1 = a1
+			a0.CFrame = v.C0
+			a1.CFrame = v.C1
+			socket.LimitsEnabled = true
+			socket.MaxFrictionTorque = 20
+			socket.TwistLimitsEnabled = true
+			socket.UpperAngle = 15
+			socket.TwistLowerAngle = -40
+			socket.TwistUpperAngle = 40
+			v.Enabled = false
+			table.insert(socketTable, socket)
+		end
+	end
+	char:FindFirstChild("AlignOrientation").Enabled = false
+end
+
+local function stopRD(char)
+	for _,v in pairs(char:GetDescendants()) do
+		if v:IsA("Motor6D") then
+			v.Enabled = true
+		end
+	end
+	for _,v in pairs(char:GetDescendants()) do
+		if v:IsA("BallSocketConstraint") then
+			v:Destroy()
+		elseif v:IsA("Attachment") then
+			if v.Name == "TEMP" then
+				v:Destroy()
+			end
+		end
+	end
+	char:FindFirstChild("LinearVelocity").MaxForce = math.huge
+	char:FindFirstChild("AlignOrientation").Enabled = true
+end
+
+events:FindFirstChild("Punch").OnServerEvent:Connect(function(plyr, enemy)
+	if plyr:DistanceFromCharacter(enemy.PrimaryPart.CFrame.Position) > 13 or enemy:FindFirstChild("GameStatus"):GetAttribute("KO") or enemy:FindFirstChild("GameStatus"):GetAttribute("Rezzing") or 
+		plyr.Character:FindFirstChild("GameStatus"):GetAttribute("KO") or plyr.Character:FindFirstChild("GameStatus"):GetAttribute("Punch") or plyr.Character:FindFirstChild("GameStatus"):GetAttribute("Rez") or
+		plyr.Character:FindFirstChild("GameStatus"):GetAttribute("Rezzing") or plyr.Character:FindFirstChild("GameStatus"):GetAttribute("Team") == enemy:FindFirstChild("GameStatus"):GetAttribute("Team") then return end
+	print("Punched "..enemy.Name)
+	enemy:FindFirstChild("GameStatus"):SetAttribute("KO", true)
+	startRD(enemy)
+end)
+--Distance from enemy > 13
+--Enemy is KO'd
+--Enemy is rezzing
+--Player is KO'd
+--Player is punching
+--Player is using rez
+--Player is rezzing
+--Player and enemy are on same team
+
+events:FindFirstChild("Rez").OnServerEvent:Connect(function(plyr, ally)
+	if plyr:DistanceFromCharacter(ally.PrimaryPart.CFrame.Position) > 13 or not ally:FindFirstChild("GameStatus"):GetAttribute("KO") or ally:FindFirstChild("GameStatus"):GetAttribute("Rezzing") or 
+		plyr.Character:FindFirstChild("GameStatus"):GetAttribute("KO") or plyr.Character:FindFirstChild("GameStatus"):GetAttribute("Punch") or plyr.Character:FindFirstChild("GameStatus"):GetAttribute("Rez") or
+		plyr.Character:FindFirstChild("GameStatus"):GetAttribute("Rezzing") or plyr.Character:FindFirstChild("GameStatus"):GetAttribute("Team") ~= ally:FindFirstChild("GameStatus"):GetAttribute("Team") then return end
+	print("Rezzing "..ally.Name)
+	ally:FindFirstChild("GameStatus"):SetAttribute("Rezzing", true)
+	ally:FindFirstChild("GameStatus"):SetAttribute("KO", false)
+	stopRD(ally)
+end)
+--Distance from ally > 13
+--Ally is not KO'd
+--Ally is rezzing
+--Player is KO'd
+--Player is punching
+--Player is using rez
+--Player is rezzing
+--Player and Ally are not on same team
